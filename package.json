@@ -27,6 +27,10 @@
     "eslint-config-next": "16.4.2",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^3.2.7"
+    "vitest": "^4.1.12"
+  },
+  "overrides": {
+    "brace-expansion@^1": "^1.1.21",
+    "source-map-js": "^1.2.2"
   }
 }
