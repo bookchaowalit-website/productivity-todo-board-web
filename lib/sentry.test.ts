@@ -34,6 +34,22 @@ describe("scrubEvent", () => {
     expect(event.extra).toBeUndefined();
   });
 
+  it("drops the request path that captureRequestError adds and strips query strings", () => {
+    const event = scrubEvent({
+      transaction: "GET /search?q=private&token=secret",
+      tags: { url: "https://todo-board.bookchaowalit.com/search?q=private", route: "/search?q=private" },
+      contexts: {
+        nextjs: { request_path: "/search?q=private", router_kind: "App Router", route_type: "render" },
+        trace: { trace_id: "t" },
+        runtime: { name: "node" },
+      },
+    });
+    expect(event.transaction).toBe("GET /search");
+    expect(event.tags).toEqual({ route: "/search" });
+    expect(event.contexts).toEqual({ runtime: { name: "node" } });
+    expect(JSON.stringify(event)).not.toContain("private");
+  });
+
   it("removes local variables (which can hold task text) from stack frames", () => {
     const event = scrubEvent({
       exception: { values: [{ type: "Error", stacktrace: { frames: [{ function: "addTodo", vars: { text: "private" } }] } }] },
