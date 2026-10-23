@@ -2,6 +2,8 @@
 
 Priority-aware todo board with filters.
 
+Live: https://todo-board.bookchaowalit.com (deployed by Vercel CLI; it can lag `main`, see `PRODUCT.md`).
+
 ## Features
 - Add / complete / delete todos
 - Priority + category
@@ -11,7 +13,8 @@ Priority-aware todo board with filters.
 - localStorage persistence
 
 ## Limitations
-- Single user local demo
+- Single user local demo: one list, no boards, drag-and-drop, due dates or export/import
+- Data lives only in this browser's localStorage
 
 ## Stack
 - Next.js App Router
@@ -39,8 +42,10 @@ npm test
 npm run build
 ```
 
-CI runs the same checks on every push (`.github/workflows/ci.yml`).
+CI (`.github/workflows/ci.yml`) runs the shared Node workflow (the same checks) and the shared security scan on every push and PR to `main`.
 
 ## Configuration
+
+- `NEXT_PUBLIC_SENTRY_DSN` (optional): enables Sentry error reporting (`lib/sentry.ts`, `instrumentation*.ts`), errors only with personal data stripped. Unset means off.
 
 - `NEXT_PUBLIC_SITE_URL` (optional): canonical origin used for metadata, `/sitemap.xml`, `/robots.txt` and the MCP app info. Defaults to `https://bookchaowalit-todo-board-frontend.vercel.app`; must be an absolute http(s) URL.

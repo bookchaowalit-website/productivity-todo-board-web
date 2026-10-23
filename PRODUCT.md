@@ -31,8 +31,31 @@ Inferred from the implementation; user confirmation pending. A quick browser ses
 - Add tasks with text, priority (`high`, `medium`, `low`), and category (`work`, `personal`, `shopping`).
 - Filter all, active, or completed tasks.
 - Toggle completion and delete tasks.
+- Filter by area (work / personal / shopping); open work sorts high → low priority, completed items sink; clear completed.
 - Persist state in browser `localStorage` only.
+- `/api/mcp` answers JSON-RPC with one tool, `get_app_info`, that returns the app's public descriptor.
+- Front-end errors go to Sentry (errors only, personal data stripped) when `NEXT_PUBLIC_SENTRY_DSN` is set.
 - Not a multi-user SaaS, synchronized task service, or payroll/enterprise workflow.
+
+## What Does Not Work (must not be claimed)
+
+Checked against the portfolio card claims review (`portfolio-site-web/docs/audits/CARD-CLAIMS-REVIEW-2026-10.md`,
+row `todo-board`) on 2026-10-22. The card claimed the items below; none exists in the code, and the review downgraded
+the card from Live to Prototype:
+
+- One list only: no multiple boards.
+- No drag-and-drop ordering (order comes from priority).
+- No due dates, no keyboard shortcuts beyond normal form/button keyboard use.
+- No export/import, no sync, no account; clearing site data deletes the tasks.
+- No product analytics are live.
+
+## Live URL and Deploy State
+
+- Live: https://todo-board.bookchaowalit.com (HTTP 200 on 2026-10-22).
+- The Vercel project is still linked to the old repository name (`bookchaowalit/bookchaowalit-todo-board-frontend`), so
+  a push to `main` does not deploy. Production runs the Next.js security patch build (`dc88df4`, deployed by CLI on
+  2026-10-23, owner-approved D9a). Later commits on `main` (shared CI, Sentry, dependency fixes, docs) wait until the
+  owner reconnects Vercel Git to this repository (owner action D9). Until then the live site has no Sentry.
 
 ## Evidence on Hand
 

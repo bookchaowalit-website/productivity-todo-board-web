@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-11  
 **Tier:** B (showcase)  
-**Title (from README):** or
+**Title (from README):** Todo Board
 
 ## Who / problem
 
@@ -35,7 +35,7 @@ Tests signal: yes (vitest unit tests for `lib/`, run in CI)
 ## Limitations (honest)
 
 - Unit tests cover board logic only; no browser/e2e tests yet.
-- No PRODUCT.md — showcase depth, not full interview case study.
+- PRODUCT.md is inferred from the code, not from a user interview.
 
 ## Do not
 
