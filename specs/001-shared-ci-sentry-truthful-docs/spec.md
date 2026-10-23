@@ -39,13 +39,14 @@ Standard: ADR-0004 (TDD + SDD). Plan: Big Loop, b-tier-b wave (target L3).
 | AC-03 | Before send, request, user, breadcrumbs and extra are removed | `lib/sentry.test.ts` "drops request data …" |
 | AC-04 | Stack-frame locals (which can hold task text) are removed | `lib/sentry.test.ts` "removes local variables …" |
 | AC-04b | Only platform contexts (os, runtime, browser, device, app) are kept, so `contexts.nextjs.request_path` is dropped; query strings are stripped from `transaction` and tags, and the `url` tag is removed (security review 2026-10-23) | `lib/sentry.test.ts` "drops the request path …" (red 1/5 against the first scrubber, then green) |
+| AC-03c | ?query and #hash are stripped from URLs in `exception.values[].value`, frame `filename`/`abs_path` and `debug_meta.images[].code_file` (second security review 2026-10-23) | `lib/sentry.test.ts` "strips query strings from URLs in the exception message, frames and debug images" (red 5/6 against the previous scrubber, then green) |
 | AC-05 | Board behaviour unchanged (add, toggle, delete, filters, priority sort, clear completed, storage) | existing `lib/todos.test.ts`, `lib/stored-state.test.ts`, `lib/mcp.test.ts`, `lib/site.test.ts`, `lib/related-projects.test.ts`, all passing on vitest 4 |
 | AC-06 | CI runs lint, typecheck, `npm test`, `next build` and gitleaks/Semgrep/OSV/Trivy, and fails on any of them | `.github/workflows/ci.yml` runs on `main` |
 
 ## 3. Red-first evidence
 
 - `lib/sentry.test.ts` written first: `npx vitest run lib/sentry.test.ts` failed (1 file failed, "no tests": `./sentry` not found).
-- After `lib/sentry.ts`: `npx vitest run` → 6 files, 33 tests pass (34 after AC-04b). `npm run lint` and `npm run typecheck` clean, `npm run build` passes.
+- After `lib/sentry.ts`: `npx vitest run` → 6 files, 33 tests pass (35 after AC-04b and AC-03c). `npm run lint` and `npm run typecheck` clean, `npm run build` passes.
 - First shared-CI run `39905721878` (commit `8b9721b`): `web` green, `security / osv-scanner` and `security / trivy-fs`
   red with the findings above. Fixed in `f777593` (vitest ^4.1.12, vite 8.3.5 via `npm update`, overrides
   `source-map-js ^1.2.2` and `brace-expansion@^1 ^1.1.21`); `npm ci` with npm 10 still works on the new lockfile.
