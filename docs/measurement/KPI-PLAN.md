@@ -1,6 +1,6 @@
 ---
 title: "Todo Board — KPI and Instrumentation Plan"
-status: draft
+status: approved
 created: 2026-10-22
 updated: 2026-10-23
 description: "What would show that the Todo Board is used and works, which events are planned, and what is live today (only Sentry)."
@@ -14,10 +14,10 @@ template: architecture-docs templates/sdlc/kpi-and-instrumentation-plan.md
 | Field | Value |
 |---|---|
 | Product | bookchaowalit-website/productivity-todo-board-web (https://todo-board.bookchaowalit.com) |
-| Version / status | 0.1 / **draft** — definitions only; no analytics is live, no baselines |
+| Version / status | 0.1 / **approved** (2026-10-24) — definitions only; no analytics is live, no baselines |
 | Metric owner | Owner (bookchaowalit) |
 | AI maker | Claude Code (b-tier-b wave, 2026-10-22) |
-| AI reviewer | not reviewed yet |
+| AI reviewer | independent Claude reviewer subagent (`solo:solo-reviewer`, Sonnet, read-only, no maker context), 2026-10-24: approved (see Approval) |
 | Charter objectives | OBJ-01 below (Tier B showcase; no charter document) |
 | Analytics source of truth | **None live.** Product analytics (PostHog) waits on owner decision D4. `@vercel/analytics` is a dependency but is not mounted in `app/layout.tsx`. Sentry (org `personal-yu0`, project `productivity-todo-board-web`) is the only live signal, and only once production is redeployed from `main` (D9; the live D9a patch build `dc88df4` predates Sentry). |
 | Dashboard | none |
@@ -81,3 +81,12 @@ sets a cookie or device ID, that is personal data under PDPA and needs a consent
 | Date | KPI ID | Change | Reason | Baseline restated? | Approved by |
 |---|---|---|---|---|---|
 | 2026-10-22 | all | First draft | Big Loop L3 | no | pending owner |
+
+## Approval (2026-10-24)
+
+| Field | Value |
+|---|---|
+| Checker | independent Claude reviewer subagent (`solo:solo-reviewer`, Sonnet, read-only, no maker context) |
+| Approver | AI approval under the owner's process (approvals by the owner or AI with evidence; maker and checker are different agents). Recorded by Claude session oa-remainder on the owner's instruction "ทำที่เหลือให้หน่อย" (2026-10-24) |
+| Verdict | **approved** |
+| Evidence | Sentry commit 554af81 newer than deployed dc88df4 (as stated); lib/sentry.ts + test; no planned events in code; @vercel/analytics not mounted. |
