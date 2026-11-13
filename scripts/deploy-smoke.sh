@@ -7,7 +7,7 @@
 # 3. MAIN_ROUTE answers 200 and shows MAIN_MARKER.
 set -euo pipefail
 
-HOME_MARKER="Personal Dispatch"
+HOME_MARKER="Todo Board"
 HEALTH_PATH="/api/health"
 MAIN_ROUTE="/more-projects"
 MAIN_MARKER="More Projects"
