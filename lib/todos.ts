@@ -74,3 +74,26 @@ export function parseTodos(raw: string | null): Todo[] | null {
     return null;
   }
 }
+
+/** What was removed and where each item sat, so Undo can put it back (see restoreTodos). */
+export type Removal = { item: Todo; beforeId: string | null }[];
+
+/** Record removals with the id of the next surviving row, so later additions do not shift them. */
+export function removalOf(todos: Todo[], ids: Set<string>): Removal {
+  return todos.flatMap((todo, index) => {
+    if (!ids.has(todo.id)) return [];
+    const next = todos.slice(index + 1).find((later) => !ids.has(later.id));
+    return [{ item: todo, beforeId: next?.id ?? null }];
+  });
+}
+
+/** Undo: reinsert each removed todo before the row that followed it, or at the end; never duplicates. */
+export function restoreTodos(todos: Todo[], removal: Removal): Todo[] {
+  let result = todos;
+  for (const { item, beforeId } of removal) {
+    if (result.some((todo) => todo.id === item.id)) continue;
+    const at = beforeId ? result.findIndex((todo) => todo.id === beforeId) : -1;
+    result = at < 0 ? [...result, item] : [...result.slice(0, at), item, ...result.slice(at)];
+  }
+  return result;
+}

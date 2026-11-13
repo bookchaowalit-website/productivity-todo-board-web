@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addTodo, deleteTodo, boardView, MAX_TEXT, clearCompleted, countTodos, parseTodos, toggleTodo, type Todo } from "./todos";
+import { addTodo, deleteTodo, boardView, MAX_TEXT, clearCompleted, countTodos, parseTodos, removalOf, restoreTodos, toggleTodo, type Todo } from "./todos";
 
 const todos: Todo[] = [
   { id: "1", text: "low open", completed: false, priority: "low", category: "work" },
@@ -92,5 +92,27 @@ describe("delete and serialized-data round trip", () => {
     expect(parseTodos("[]")).toEqual([]);
     expect(parseTodos(null)).toBeNull();
     expect(parseTodos("{} ")).toBeNull();
+  });
+});
+
+describe("undo (removalOf / restoreTodos)", () => {
+  const t = (id: string, completed = false): Todo => ({ id, text: id, completed, priority: "medium", category: "work" });
+  const list = [t("a"), t("b", true), t("c"), t("d", true)];
+
+  it("restores one removed todo before its old neighbour even after a new todo was added on top", () => {
+    const removal = removalOf(list, new Set(["c"]));
+    const after = [t("new"), ...list.filter((todo) => todo.id !== "c")];
+    expect(restoreTodos(after, removal).map((todo) => todo.id)).toEqual(["new", "a", "b", "c", "d"]);
+  });
+
+  it("restores a cleared group in place, and appends when the neighbour is gone", () => {
+    const ids = new Set(["b", "d"]);
+    const removal = removalOf(list, ids);
+    expect(removal.map((r) => [r.item.id, r.beforeId])).toEqual([["b", "c"], ["d", null]]);
+    expect(restoreTodos(list.filter((todo) => !ids.has(todo.id)), removal).map((todo) => todo.id)).toEqual(["a", "b", "c", "d"]);
+  });
+
+  it("never duplicates a todo that is already back", () => {
+    expect(restoreTodos(list, removalOf(list, new Set(["a"]))).length).toBe(4);
   });
 });

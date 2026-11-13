@@ -1,3 +1,11 @@
+# Todo Board — design
+
+Since 2026-11-13 this app uses the shared App shell (`APP-SHELL.md`): calm light/dark theme,
+lists by area with open counts, an always-open quick-add, round checkboxes, priority pills and
+undoable remove / clear. The earlier "Personal Dispatch" theme below is kept for history.
+
+---
+
 # Design system
 
 ## Overview

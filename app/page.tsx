@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-import { addTodo, deleteTodo, boardView, CATEGORIES, clearCompleted, countTodos, MAX_TEXT, parseTodos, toggleTodo, type AreaFilter, type Category, type Filter, type Priority, type Todo } from "@/lib/todos";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { AppFoot, AppTop, ListButton, Pill, type Tone } from "@/components/app-shell";
+import { addTodo, boardView, CATEGORIES, countTodos, MAX_TEXT, parseTodos, PRIORITIES, removalOf, restoreTodos, toggleTodo, type AreaFilter, type Category, type Filter, type Priority, type Removal, type Todo } from "@/lib/todos";
 import { useStoredState } from "@/lib/use-stored-state";
 
 const STORE_KEY = "todo-board-v2";
@@ -10,19 +11,185 @@ const SEED: Todo[] = [
   { id: "2", text: "Buy groceries", completed: false, priority: "medium", category: "shopping" },
   { id: "3", text: "Morning workout", completed: true, priority: "low", category: "personal" },
 ];
+const TONE: Record<Priority, Tone> = { high: "red", medium: "amber", low: "grey" };
+const AREA_TONE: Record<Category, Tone> = { work: "green", personal: "amber", shopping: "grey" };
+const label = (value: string) => value[0].toUpperCase() + value.slice(1);
+const FILTERS: Filter[] = ["all", "active", "completed"];
 
 export default function Home() {
   const [todos, setTodos] = useStoredState(STORE_KEY, SEED, parseTodos);
-  const [text, setText] = useState(""); const [priority, setPriority] = useState<Priority>("medium"); const [category, setCategory] = useState<Category>("work"); const [filter, setFilter] = useState<Filter>("all"); const [area, setArea] = useState<AreaFilter>("all");
-  const visible = boardView(todos, filter, area);
-  const add = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); if (!text.trim()) return; setTodos((current) => addTodo(current, text, priority, category, crypto.randomUUID())); setText(""); };
-  const counts = countTodos(todos, area); const openTotal = countTodos(todos).active;
+  const [area, setArea] = useState<AreaFilter>("all");
+  const [filter, setFilter] = useState<Filter>("all");
+  const [text, setText] = useState("");
+  const [priority, setPriority] = useState<Priority>("medium");
+  const [category, setCategory] = useState<Category>("work");
+  const [undo, setUndo] = useState<{ removal: Removal; message: string; viaKeyboard: boolean } | null>(null);
+  const [toastFocused, setToastFocused] = useState(false);
+  const [announcement, setAnnouncement] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const undoRef = useRef<HTMLButtonElement>(null);
 
-  return <main className="dispatch-room">
-    <header className="dispatch-bar"><div className="dispatch-mark">B/07</div><div className="dispatch-name"><strong>PERSONAL DISPATCH</strong><span>ONE OPERATOR · LOCAL BOARD</span></div><div className="dispatch-state"><i /> {openTotal} OPEN ASSIGNMENTS</div></header>
-    <section className="dispatch-hero"><div><p className="dispatch-kicker">WORK / HOME / NEXT</p><h1>Make the<br /><em>next move.</em></h1><p className="hero-copy">A priority-aware board for the small set of things that deserve your attention today.</p></div><div className="dispatch-index"><span>BOARD</span><strong>01</strong><small>LOCAL<br />ONLY</small></div></section>
-    <section className="new-assignment" aria-label="Add a task"><div className="form-heading"><span>INCOMING WORK</span><h2>Put it on the board.</h2></div><form className="assignment-form" onSubmit={add}><label><span>Task</span><input placeholder="What needs doing?" value={text} maxLength={MAX_TEXT} required onChange={(event) => setText(event.target.value)} /></label><label><span>Priority</span><select value={priority} onChange={(event) => setPriority(event.target.value as Priority)}><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label><label><span>Area</span><select value={category} onChange={(event) => setCategory(event.target.value as Category)}><option value="work">Work</option><option value="personal">Personal</option><option value="shopping">Shopping</option></select></label><button className="add-button" type="submit">Add assignment <b aria-hidden="true">↗</b></button></form></section>
-    <section className="board-section" aria-label="Task board"><div className="board-heading"><div><p className="dispatch-kicker">THE ACTIVE BOARD</p><h2>Where attention goes.</h2></div><div className="filter-tabs" role="group" aria-label="Task filter"><label className="area-filter"><span>Area</span><select value={area} onChange={(event) => setArea(event.target.value as AreaFilter)}><option value="all">All areas</option>{CATEGORIES.map((option) => <option key={option} value={option}>{option[0].toUpperCase() + option.slice(1)}</option>)}</select></label>{(["all", "active", "completed"] as const).map((option) => <button type="button" key={option} aria-pressed={filter === option} className={filter === option ? "active" : ""} onClick={() => setFilter(option)}>{option}<b>{counts[option]}</b></button>)}{counts.completed > 0 ? <button type="button" onClick={() => setTodos(clearCompleted)}>clear done</button> : null}</div></div><div className="task-list">{visible.length === 0 ? <div className="empty-board"><span>—</span><p>Nothing in this lane. Add a task or change the filter.</p></div> : visible.map((todo, index) => <article className={`task-row ${todo.completed ? "done" : ""}`} key={todo.id}><span className="task-number">{String(index + 1).padStart(2, "0")}</span><label className="task-check"><input type="checkbox" aria-label={`Mark "${todo.text}" as ${todo.completed ? "not done" : "done"}`} checked={todo.completed} onChange={() => setTodos((current) => toggleTodo(current, todo.id))} /><span /></label><div className="task-copy"><strong>{todo.text}</strong><span>{todo.category} · {todo.completed ? "cleared" : "waiting for action"}</span></div><span className={`priority priority-${todo.priority}`}>{todo.priority}</span><button type="button" className="remove-task" aria-label={`Remove "${todo.text}"`} onClick={() => setTodos((current) => deleteTodo(current, todo.id))}>Remove</button></article>)}</div></section>
-    <footer className="dispatch-footer"><span>BOOKCHAOWALIT / TODO BOARD</span><span>LOCAL BROWSER STATE · DEMO-GRADE</span></footer>
-  </main>;
+  const visible = boardView(todos, filter, area);
+  const counts = countTodos(todos, area);
+  const openIn = (value: AreaFilter) => countTodos(todos, value).active;
+
+  // Removing with the keyboard moves focus to Undo (the focused Remove button is gone); the toast
+  // never times out while it has focus. A mouse removal leaves focus where it was.
+  useEffect(() => { if (undo?.viaKeyboard) undoRef.current?.focus(); }, [undo]);
+  useEffect(() => {
+    if (!undo || toastFocused) return;
+    const timer = window.setTimeout(() => setUndo(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [undo, toastFocused]);
+
+  function chooseArea(next: AreaFilter) {
+    setArea(next);
+    if (next !== "all") setCategory(next);
+  }
+  function add(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!text.trim()) return;
+    setTodos((current) => addTodo(current, text, priority, category, crypto.randomUUID()));
+    setAnnouncement(`Added “${text.trim()}” to ${label(category)}.`);
+    setText("");
+    inputRef.current?.focus();
+  }
+  function remove(ids: Set<string>, message: string, viaKeyboard: boolean) {
+    setUndo({ removal: removalOf(todos, ids), message, viaKeyboard });
+    setTodos((current) => current.filter((todo) => !ids.has(todo.id)));
+    setAnnouncement(`${message}. Undo is available for a few seconds.`);
+  }
+  function closeToast() {
+    setUndo(null);
+    setToastFocused(false);
+    inputRef.current?.focus();
+  }
+  function restore() {
+    if (!undo) return;
+    const { removal } = undo;
+    setTodos((current) => restoreTodos(current, removal));
+    setAnnouncement(removal.length === 1 ? `Restored “${removal[0].item.text}”.` : `Restored ${removal.length} tasks.`);
+    closeToast();
+  }
+
+  const title = area === "all" ? "All tasks" : label(area);
+  const doneIds = new Set(todos.filter((todo) => todo.completed && (area === "all" || todo.category === area)).map((todo) => todo.id));
+
+  return (
+    <div className="as">
+      <a className="as-skip" href="#main">Skip to content</a>
+      <AppTop name="Todo Board" tagline="Today’s tasks, highest priority first" />
+
+      <div className="as-body">
+        <aside className="as-side" aria-label="Lists">
+          <h2>Lists</h2>
+          <ul className="as-lists">
+            <ListButton label="All tasks" count={openIn("all")} current={area === "all"} onSelect={() => chooseArea("all")} />
+            {CATEGORIES.map((value) => (
+              <ListButton key={value} label={label(value)} count={openIn(value)} tone={AREA_TONE[value]} current={area === value} onSelect={() => chooseArea(value)} />
+            ))}
+          </ul>
+        </aside>
+
+        <main id="main" className="as-main">
+          <div className="as-head">
+            <div>
+              <h1>{title}</h1>
+              <p aria-live="polite">{counts.active} open · {counts.completed} done</p>
+            </div>
+            <div className="as-tools">
+              <div className="as-segmented" role="group" aria-label="Show">
+                {FILTERS.map((value) => (
+                  <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)}>{label(value)} {counts[value]}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <form className="as-composer" onSubmit={add} aria-label="Add a task">
+            <label className="as-field">New task
+              <input ref={inputRef} value={text} maxLength={MAX_TEXT} onChange={(event) => setText(event.target.value)} placeholder="What needs doing?" autoComplete="off" />
+            </label>
+            <div className="as-composer-foot">
+              <div className="as-chips">
+                <div className="as-segmented-wrap">
+                  <span id="priority-label">Priority</span>
+                  <div className="as-segmented" role="group" aria-labelledby="priority-label">
+                    {PRIORITIES.map((value) => (
+                      <button key={value} type="button" aria-pressed={priority === value} onClick={() => setPriority(value)}>{label(value)}</button>
+                    ))}
+                  </div>
+                </div>
+                {area === "all" ? (
+                  <div className="as-segmented-wrap">
+                    <span id="area-label">List</span>
+                    <div className="as-segmented" role="group" aria-labelledby="area-label">
+                      {CATEGORIES.map((value) => (
+                        <button key={value} type="button" aria-pressed={category === value} onClick={() => setCategory(value)}>{label(value)}</button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+              <button type="submit" className="as-button" disabled={!text.trim()}>Add</button>
+            </div>
+          </form>
+
+          {visible.length ? (
+            <ul className="as-list" aria-label={title}>
+              {visible.map((todo) => (
+                <li className="as-row as-row-check" key={todo.id} data-done={todo.completed ? "true" : undefined}>
+                  <label className="as-check">
+                    <input type="checkbox" checked={todo.completed} onChange={() => setTodos((current) => toggleTodo(current, todo.id))} aria-label={`${todo.text}: mark as ${todo.completed ? "not done" : "done"}`} />
+                    <span aria-hidden="true" />
+                  </label>
+                  <div>
+                    <h3>{todo.text}</h3>
+                    <p>{label(todo.category)}</p>
+                  </div>
+                  <Pill tone={TONE[todo.priority]}>{label(todo.priority)}</Pill>
+                  <button type="button" className="as-plain as-danger" aria-label={`Remove ${todo.text}`} onClick={(event) => remove(new Set([todo.id]), `Removed “${todo.text}”`, event.detail === 0)}>Remove</button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="as-list as-empty">
+              {counts.all === 0 ? (
+                <><strong>No tasks yet</strong>Type a task above and press Add.</>
+              ) : filter === "completed" ? (
+                <><strong>Nothing done yet</strong>Tick a task when you finish it.</>
+              ) : (
+                <><strong>All done</strong>Every task in this list is complete.</>
+              )}
+            </div>
+          )}
+
+          {counts.completed > 0 ? (
+            <div className="as-actions-row">
+              <button type="button" className="as-plain" onClick={(event) => remove(doneIds, `Cleared ${doneIds.size} done ${doneIds.size === 1 ? "task" : "tasks"}`, event.detail === 0)}>Clear {counts.completed} done</button>
+            </div>
+          ) : null}
+
+          <p className="as-note">Saved in this browser only. No account and nothing is uploaded.</p>
+        </main>
+      </div>
+
+      <p className="as-sr" role="status" aria-live="polite">{announcement}</p>
+      {undo ? (
+        <div
+          className="as-toast"
+          role="group"
+          aria-label="Undo"
+          onFocus={() => setToastFocused(true)}
+          onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setToastFocused(false); }}
+          onKeyDown={(event) => { if (event.key === "Escape") closeToast(); }}
+        >
+          <span>{undo.message}</span>
+          <button ref={undoRef} type="button" className="as-plain" onClick={restore}>Undo</button>
+        </div>
+      ) : null}
+
+      <AppFoot source="https://github.com/bookchaowalit-website/productivity-todo-board-web" />
+    </div>
+  );
 }
