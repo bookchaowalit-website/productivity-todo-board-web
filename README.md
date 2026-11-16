@@ -48,4 +48,4 @@ CI (`.github/workflows/ci.yml`) runs the shared Node workflow (the same checks) 
 
 - `NEXT_PUBLIC_SENTRY_DSN` (optional): enables Sentry error reporting (`lib/sentry.ts`, `instrumentation*.ts`), errors only with personal data stripped. Unset means off.
 
-- `NEXT_PUBLIC_SITE_URL` (optional): canonical origin used for metadata, `/sitemap.xml`, `/robots.txt` and the MCP app info. Defaults to `https://bookchaowalit-todo-board-frontend.vercel.app`; must be an absolute http(s) URL.
+- `NEXT_PUBLIC_SITE_URL` (optional): canonical origin used for metadata, `/sitemap.xml`, `/robots.txt` and the MCP app info. Defaults to `https://todo-board.bookchaowalit.com`; must be an absolute http(s) URL.
