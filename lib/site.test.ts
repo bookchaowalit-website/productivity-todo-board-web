@@ -19,10 +19,11 @@ describe("resolveSiteUrl", () => {
 describe("default origin", () => {
   it("is the custom domain, not the vercel.app alias", () => {
     expect(DEFAULT_SITE_URL).toBe("https://todo-board.bookchaowalit.com");
-    expect(buildRobots().sitemap).toBe("https://todo-board.bookchaowalit.com/sitemap.xml");
+    expect(resolveSiteUrl(undefined)).toBe("https://todo-board.bookchaowalit.com");
+    expect(buildRobots(DEFAULT_SITE_URL).sitemap).toBe("https://todo-board.bookchaowalit.com/sitemap.xml");
   });
   it("keeps the retired /more-projects page out of the sitemap", () => {
-    expect(buildSitemap().map((entry) => entry.url)).toEqual(["https://todo-board.bookchaowalit.com"]);
+    expect(buildSitemap(DEFAULT_SITE_URL).map((entry) => entry.url)).toEqual(["https://todo-board.bookchaowalit.com"]);
   });
 });
 
