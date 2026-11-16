@@ -4,13 +4,13 @@
 # 1. The home page answers 200 and shows HOME_MARKER.
 # 2. The build marker (HEALTH_PATH) reports the expected commit. Retried while Vercel moves the
 #    production alias; without an expected commit it only has to report one.
-# 3. MAIN_ROUTE answers 200 and shows MAIN_MARKER.
+# 3. The retired REDIRECT_ROUTE answers 308 with Location REDIRECT_TARGET (not followed).
 set -euo pipefail
 
 HOME_MARKER="Todo Board"
 HEALTH_PATH="/api/health"
-MAIN_ROUTE="/more-projects"
-MAIN_MARKER="More Projects"
+REDIRECT_ROUTE="/more-projects"
+REDIRECT_TARGET="https://bookchaowalit.com/"
 
 BASE="${1:?usage: deploy-smoke.sh <base-url> [expected-commit]}"
 BASE="${BASE%/}"
@@ -24,6 +24,19 @@ trap 'rm -f "$body"' EXIT
 
 get() {
   curl -sS -L --max-time 30 -o "$body" -w '%{http_code}' -H 'cache-control: no-cache' "$BASE$1" || echo "000"
+}
+
+redirect() {
+  local path="$1" target="$2" out code location
+  out=$(curl -sS --max-time 30 -o /dev/null -w '%{http_code} %{redirect_url}' -H 'cache-control: no-cache' "$BASE$path" || echo "000 ")
+  code="${out%% *}"
+  location="${out#* }"
+  if [ "$code" = 308 ] && [ "$location" = "$target" ]; then
+    echo "ok   308 $path -> $target"
+  else
+    echo "::error::FAIL $path answered $code with Location '${location}', expected 308 to $target"
+    fail=1
+  fi
 }
 
 page() {
@@ -60,6 +73,6 @@ else
   fail=1
 fi
 
-page "$MAIN_ROUTE" "$MAIN_MARKER"
+redirect "$REDIRECT_ROUTE" "$REDIRECT_TARGET"
 
 exit "$fail"
