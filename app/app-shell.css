@@ -168,3 +168,6 @@
 }
 .as-actions-row { display: flex; justify-content: flex-end; margin-top: 8px; }
 .as-head > div:first-child { min-width: 0; max-width: 100%; }
+
+/* The top bar is sticky: keep skip-link targets and keyboard-focused controls clear of it when the page scrolls to them. */
+html { scroll-padding-top: 64px; scroll-padding-bottom: 16px; }
