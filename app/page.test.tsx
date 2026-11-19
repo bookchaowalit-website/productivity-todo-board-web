@@ -166,18 +166,55 @@ describe("2026-11-19 review fixes", () => {
     expect($(".as")!.dataset.toast).toBe("true");
   });
 
-  it("imports a JSON backup, adding only new tasks, and rejects a file that is not one", async () => {
+  const choose = async (contents: string | Error) => {
     const input = $<HTMLInputElement>('input[type="file"]')!;
-    const choose = async (text: string) => {
-      const file = new File([text], "backup.json", { type: "application/json" });
-      Object.defineProperty(input, "files", { value: [file], configurable: true });
-      await act(async () => { input.dispatchEvent(new Event("change", { bubbles: true })); });
-    };
-    await choose(JSON.stringify([{ id: "1", text: "Complete project proposal", completed: false, priority: "high", category: "work" }, { id: "z", text: "Renew passport", completed: false, priority: "high", category: "personal" }]));
-    expect(host.textContent).toContain("Imported 1 task.");
+    const file = new File([typeof contents === "string" ? contents : ""], "backup.json", { type: "application/json" });
+    if (contents instanceof Error) Object.defineProperty(file, "text", { value: () => Promise.reject(contents) });
+    Object.defineProperty(input, "files", { value: [file], configurable: true });
+    await act(async () => { input.dispatchEvent(new Event("change", { bubbles: true })); });
+  };
+
+  it("restoring onto the untouched sample board lets the backup win", async () => {
+    await choose(JSON.stringify([{ id: "2", text: "Buy groceries", completed: true, priority: "medium", category: "shopping" }, { id: "z", text: "Renew passport", completed: false, priority: "high", category: "personal" }]));
+    expect(host.textContent).toContain("Imported 2 tasks. Removed 2 unchanged sample tasks.");
+    expect(rows()).toEqual(["Renew passport", "Buy groceries"]);
+    expect(stored().find((t) => t.text === "Buy groceries")!.completed).toBe(true);
+  });
+
+  it("keeps the person's own and edited tasks, adds only new ones", async () => {
+    act(() => { $<HTMLInputElement>('[aria-label="Buy groceries: mark as done"]')!.click(); });
+    await choose(JSON.stringify([{ id: "2", text: "Buy groceries", completed: false, priority: "medium", category: "shopping" }, { id: "z", text: "Renew passport", completed: false, priority: "high", category: "personal" }]));
     expect(rows()).toContain("Renew passport");
+    expect(stored().find((t) => t.text === "Buy groceries")!.completed).toBe(true);
+    expect(host.textContent).toContain("1 task already on the board was kept as it is.");
+  });
+
+  it("rejects a file that is not a backup or cannot be read, without changing the board", async () => {
+    const before = rows();
     await choose("not json");
     expect(host.textContent).toContain("That file is not a Todo Board backup.");
+    await choose(JSON.stringify([{ id: "x", title: "Other app" }]));
+    expect(host.textContent).toContain("That file is not a Todo Board backup.");
+    await choose(new Error("gone"));
+    expect(host.textContent).toContain("Could not read that file. Nothing was changed.");
+    expect(rows()).toEqual(before);
+  });
+
+  it("keeps the composer open during a press outside it and collapses once the press ends", () => {
+    vi.useFakeTimers();
+    const form = $<HTMLFormElement>(".as-composer")!;
+    const input = $<HTMLInputElement>(".as-composer input")!;
+    act(() => { input.focus(); });
+    act(() => { window.dispatchEvent(new Event("pointerdown")); });
+    act(() => { input.blur(); });
+    expect(form.dataset.open).toBe("true");
+    act(() => { window.dispatchEvent(new Event("pointerup")); vi.advanceTimersByTime(0); });
+    expect(form.dataset.open).toBeUndefined();
+  });
+
+  it("keeps the Added live region in the page while it is empty", () => {
+    expect($('.as-added[role="status"]')).not.toBeNull();
+    expect($(".as-added")!.textContent).toBe("");
   });
 
   it("exports the board as a JSON download", () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addTodo, exportTodos, mergeImported, deleteTodo, boardView, MAX_TEXT, clearCompleted, countTodos, parseTodos, removalOf, restoreTodos, toggleTodo, type Todo } from "./todos";
+import { addTodo, exportTodos, readBackup, restoreBackup, SAMPLE_TODOS, deleteTodo, boardView, MAX_TEXT, clearCompleted, countTodos, parseTodos, removalOf, restoreTodos, toggleTodo, type Todo } from "./todos";
 
 const todos: Todo[] = [
   { id: "1", text: "low open", completed: false, priority: "low", category: "work" },
@@ -118,15 +118,37 @@ describe("undo (removalOf / restoreTodos)", () => {
 });
 
 describe("backup", () => {
-  const base: Todo[] = [{ id: "a", text: "One", completed: false, priority: "low", category: "work" }];
-  it("round-trips through exportTodos and mergeImported without duplicates", () => {
-    const raw = exportTodos([...base, { id: "b", text: "  Two  ", completed: true, priority: "high", category: "shopping" }]);
-    const result = mergeImported(base, raw)!;
-    expect(result.added).toBe(1);
-    expect(result.todos.map((t) => t.text)).toEqual(["One", "Two"]);
+  const mine: Todo = { id: "a", text: "One", completed: false, priority: "low", category: "work" };
+  it("readBackup accepts an export, cleans text, and rejects files that are not a todo list", () => {
+    expect(readBackup(exportTodos([{ ...mine, text: "  One  " }]))).toEqual([mine]);
+    expect(readBackup("[]")).toEqual([]);
+    expect(readBackup("{}")).toBeNull();
+    expect(readBackup("nope")).toBeNull();
+    // A non-empty array with no valid task (another app's export) is the wrong format, not "all duplicates".
+    expect(readBackup(JSON.stringify([{ id: "x", title: "Other app" }]))).toBeNull();
   });
-  it("returns null for a file that is not a todo list", () => {
-    expect(mergeImported(base, "{}")).toBeNull();
-    expect(mergeImported(base, "nope")).toBeNull();
+
+  it("adds new ids and skips ids already on the board", () => {
+    const result = restoreBackup([mine], [mine, { ...mine, id: "b", text: "Two" }], []);
+    expect(result.todos.map((t) => t.text)).toEqual(["One", "Two"]);
+    expect(result).toMatchObject({ added: 1, skipped: 1, replaced: 0, droppedSamples: 0 });
+  });
+
+  it("on a fresh sample board the backup wins: same-id samples are replaced, missing samples do not come back", () => {
+    const backup: Todo[] = [{ ...SAMPLE_TODOS[1], completed: true }, mine];
+    const result = restoreBackup(SAMPLE_TODOS, backup);
+    expect(result.todos).toEqual([{ ...SAMPLE_TODOS[1], completed: true }, mine]);
+    expect(result).toMatchObject({ added: 1, replaced: 1, droppedSamples: 2 });
+  });
+
+  it("an edited sample counts as the person's task and is kept over the backup copy", () => {
+    const edited = { ...SAMPLE_TODOS[0], text: "Proposal v2" };
+    const result = restoreBackup([edited, SAMPLE_TODOS[1]], [SAMPLE_TODOS[0], mine]);
+    expect(result.todos).toEqual([edited, mine]);
+    expect(result).toMatchObject({ skipped: 1, droppedSamples: 1, added: 1 });
+  });
+
+  it("an empty backup changes nothing", () => {
+    expect(restoreBackup(SAMPLE_TODOS, []).todos).toBe(SAMPLE_TODOS);
   });
 });

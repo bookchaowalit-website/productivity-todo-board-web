@@ -1,23 +1,29 @@
 "use client";
 
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { flushSync } from "react-dom";
 import { AppFoot, AppTop, ListButton, Pill, type Tone } from "@/components/app-shell";
-import { addTodo, boardView, exportTodos, mergeImported, CATEGORIES, countTodos, MAX_TEXT, parseTodos, PRIORITIES, removalOf, restoreTodos, toggleTodo, type AreaFilter, type Category, type Filter, type Priority, type Removal, type Todo } from "@/lib/todos";
+import { addTodo, boardView, exportTodos, readBackup, restoreBackup, SAMPLE_TODOS, CATEGORIES, countTodos, MAX_TEXT, parseTodos, PRIORITIES, removalOf, restoreTodos, toggleTodo, type AreaFilter, type Category, type Filter, type Priority, type Removal, type RestoreResult } from "@/lib/todos";
 import { useStoredState } from "@/lib/use-stored-state";
 
 const STORE_KEY = "todo-board-v2";
-const SEED: Todo[] = [
-  { id: "1", text: "Complete project proposal", completed: false, priority: "high", category: "work" },
-  { id: "2", text: "Buy groceries", completed: false, priority: "medium", category: "shopping" },
-  { id: "3", text: "Morning workout", completed: true, priority: "low", category: "personal" },
-];
 const TONE: Record<Priority, Tone> = { high: "red", medium: "amber", low: "grey" };
 const AREA_TONE: Record<Category, Tone> = { work: "green", personal: "amber", shopping: "grey" };
 const label = (value: string) => value[0].toUpperCase() + value.slice(1);
 const FILTERS: Filter[] = ["all", "active", "completed"];
 
+const plural = (n: number) => `${n} ${n === 1 ? "task" : "tasks"}`;
+function importMessage({ added, replaced, droppedSamples, skipped }: RestoreResult): string {
+  const restored = added + replaced;
+  if (!restored) return skipped ? "Every task in that file is already on the board." : "Nothing new in that file.";
+  const parts = [`Imported ${plural(restored)}.`];
+  if (droppedSamples) parts.push(`Removed ${droppedSamples} unchanged sample ${droppedSamples === 1 ? "task" : "tasks"}.`);
+  if (skipped) parts.push(`${plural(skipped)} already on the board ${skipped === 1 ? "was" : "were"} kept as ${skipped === 1 ? "it is" : "they are"}.`);
+  return parts.join(" ");
+}
+
 export default function Home() {
-  const [todos, setTodos] = useStoredState(STORE_KEY, SEED, parseTodos);
+  const [todos, setTodos] = useStoredState(STORE_KEY, SAMPLE_TODOS, parseTodos);
   const [area, setArea] = useState<AreaFilter>("all");
   const [filter, setFilter] = useState<Filter>("all");
   const [text, setText] = useState("");
@@ -29,6 +35,10 @@ export default function Home() {
   // The last added task: highlighted in the list and named in a visible line under the composer.
   const [added, setAdded] = useState<{ id: string; message: string } | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
+  // A mouse or touch press that moves focus out of the composer must not collapse it before the click lands
+  // (the rows would jump and the press could miss its button), so collapsing waits for the press to end.
+  const pressing = useRef(false);
+  const formRef = useRef<HTMLFormElement>(null);
   const [backupNote, setBackupNote] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const undoRef = useRef<HTMLButtonElement>(null);
@@ -51,6 +61,22 @@ export default function Home() {
     const timer = window.setTimeout(() => setAdded(null), 4000);
     return () => window.clearTimeout(timer);
   }, [added]);
+  useEffect(() => {
+    const down = () => { pressing.current = true; };
+    const up = () => {
+      pressing.current = false;
+      // After the click that follows this pointerup has run.
+      window.setTimeout(() => { if (!formRef.current?.contains(document.activeElement)) setComposerOpen(false); }, 0);
+    };
+    window.addEventListener("pointerdown", down, true);
+    window.addEventListener("pointerup", up, true);
+    window.addEventListener("pointercancel", up, true);
+    return () => {
+      window.removeEventListener("pointerdown", down, true);
+      window.removeEventListener("pointerup", up, true);
+      window.removeEventListener("pointercancel", up, true);
+    };
+  }, []);
 
   function chooseArea(next: AreaFilter) {
     setArea(next);
@@ -84,13 +110,30 @@ export default function Home() {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    const result = mergeImported(todos, await file.text());
-    if (!result) {
+    // Read and validate the whole file first; only then merge, onto the latest board (tasks added, ticked or
+    // removed while the file was being read are kept).
+    let raw: string;
+    try {
+      raw = await file.text();
+    } catch {
+      setBackupNote("Could not read that file. Nothing was changed.");
+      return;
+    }
+    const backup = readBackup(raw);
+    if (!backup) {
       setBackupNote("That file is not a Todo Board backup. Nothing was changed.");
       return;
     }
-    setTodos(result.todos);
-    setBackupNote(result.added === 0 ? "Every task in that file is already on the board." : `Imported ${result.added} ${result.added === 1 ? "task" : "tasks"}.`);
+    if (!backup.length) {
+      setBackupNote("That backup has no tasks. Nothing was changed.");
+      return;
+    }
+    let result: RestoreResult | undefined;
+    flushSync(() => setTodos((current) => {
+      result = restoreBackup(current, backup);
+      return result.todos;
+    }));
+    setBackupNote(importMessage(result!));
   }
   function closeToast() {
     setUndo(null);
@@ -141,12 +184,13 @@ export default function Home() {
           </div>
 
           <form
+            ref={formRef}
             className="as-composer"
             onSubmit={add}
             aria-label="Add a task"
             data-open={composerOpen || text ? "true" : undefined}
             onFocus={() => setComposerOpen(true)}
-            onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setComposerOpen(false); }}
+            onBlur={(event) => { if (!pressing.current && !event.currentTarget.contains(event.relatedTarget as Node | null)) setComposerOpen(false); }}
           >
             <label className="as-field">New task
               <input ref={inputRef} value={text} maxLength={MAX_TEXT} onChange={(event) => setText(event.target.value)} placeholder="What needs doing?" autoComplete="off" aria-describedby="task-count" />

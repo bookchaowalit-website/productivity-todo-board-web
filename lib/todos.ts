@@ -98,19 +98,70 @@ export function restoreTodos(todos: Todo[], removal: Removal): Todo[] {
   return result;
 }
 
-/** Backup file: the board as pretty JSON, read back by mergeImported. */
+/** The sample board a first visit starts with (also what a cleared browser starts with again). */
+export const SAMPLE_TODOS: Todo[] = [
+  { id: "1", text: "Complete project proposal", completed: false, priority: "high", category: "work" },
+  { id: "2", text: "Buy groceries", completed: false, priority: "medium", category: "shopping" },
+  { id: "3", text: "Morning workout", completed: true, priority: "low", category: "personal" },
+];
+
+/** Backup file: the board as pretty JSON, read back by readBackup. */
 export function exportTodos(todos: Todo[]): string {
   return JSON.stringify(todos, null, 2);
 }
 
 /**
- * Import a backup: valid todos whose id is not on the board yet are added after the current tasks.
- * Returns null when the file is not a todo list (not JSON or not an array), so nothing changes.
+ * Validate a backup file before touching the board. Returns null when it is not a Todo Board backup: not JSON,
+ * not an array, or a non-empty array without a single valid task (e.g. another app's export). Text is cleaned
+ * the same way as typed tasks; tasks whose text is empty after cleaning are dropped.
  */
-export function mergeImported(todos: Todo[], raw: string): { todos: Todo[]; added: number } | null {
-  const incoming = parseTodos(raw);
-  if (!incoming) return null;
-  const ids = new Set(todos.map((todo) => todo.id));
-  const fresh = incoming.filter((todo) => !ids.has(todo.id)).map((todo) => ({ ...todo, text: cleanText(todo.text) })).filter((todo) => todo.text);
-  return { todos: [...todos, ...fresh], added: fresh.length };
+export function readBackup(raw: string): Todo[] | null {
+  const parsed = parseTodos(raw);
+  if (!parsed) return null;
+  let data: unknown[] = [];
+  try { data = JSON.parse(raw) as unknown[]; } catch { return null; }
+  if (data.length > 0 && parsed.length === 0) return null;
+  return parsed.map((todo) => ({ ...todo, text: cleanText(todo.text) })).filter((todo) => todo.text);
+}
+
+const sameTodo = (a: Todo, b: Todo) => a.text === b.text && a.completed === b.completed && a.priority === b.priority && a.category === b.category;
+/** A sample task nobody has changed since the board started (same id and same fields as in SAMPLE_TODOS). */
+export function isUntouchedSample(todo: Todo, samples: Todo[] = SAMPLE_TODOS): boolean {
+  const sample = samples.find((item) => item.id === todo.id);
+  return Boolean(sample && sameTodo(sample, todo));
+}
+
+export type RestoreResult = { todos: Todo[]; added: number; replaced: number; droppedSamples: number; skipped: number };
+
+/**
+ * Apply a validated backup to the latest board (call inside a functional state update).
+ * - The backup wins over untouched samples: a backup task with a sample's id replaces it, and untouched samples
+ *   the backup does not have are dropped (the backup is the person's real board; the samples were never theirs).
+ * - Every other task on the board is kept as it is; a backup task whose id is already there is skipped.
+ * - Tasks with new ids are added after the board's tasks, in backup order.
+ * An empty backup changes nothing (it never wipes the samples on its own).
+ */
+export function restoreBackup(todos: Todo[], backup: Todo[], samples: Todo[] = SAMPLE_TODOS): RestoreResult {
+  if (!backup.length) return { todos, added: 0, replaced: 0, droppedSamples: 0, skipped: 0 };
+  const incoming = new Map(backup.map((todo) => [todo.id, todo]));
+  let replaced = 0;
+  let droppedSamples = 0;
+  let skipped = 0;
+  const used = new Set<string>();
+  const kept: Todo[] = [];
+  for (const todo of todos) {
+    const fromBackup = incoming.get(todo.id);
+    if (isUntouchedSample(todo, samples)) {
+      if (fromBackup) {
+        used.add(todo.id);
+        if (sameTodo(fromBackup, todo)) kept.push(todo);
+        else { kept.push(fromBackup); replaced += 1; }
+      } else droppedSamples += 1;
+      continue;
+    }
+    if (fromBackup) { used.add(todo.id); skipped += 1; }
+    kept.push(todo);
+  }
+  const fresh = backup.filter((todo) => !used.has(todo.id));
+  return { todos: [...kept, ...fresh], added: fresh.length, replaced, droppedSamples, skipped };
 }

@@ -181,9 +181,12 @@ html { scroll-padding-top: 64px; scroll-padding-bottom: 16px; }
 .as-filter button[aria-pressed="true"] { background: var(--as-fg); color: var(--as-bg); box-shadow: none; }
 .as-counter { margin: -6px 0 0; color: var(--as-muted); font-size: 13px; font-variant-numeric: tabular-nums; text-align: right; }
 .as-counter[data-near="true"] { color: var(--as-fg); font-weight: 600; }
-.as-added { min-height: 0; margin: -8px 0 12px; color: var(--as-green); font-size: 14px; font-weight: 600; }
-.as-added:empty { display: none; }
+.as-added { min-height: 0; margin: -8px 0 12px; color: var(--as-green); font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+/* Empty: hidden visually only, so the live region stays in the accessibility tree and its next text is announced. */
+.as-added:empty { position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden; clip-path: inset(50%); }
 .as-row[data-new="true"] { background: var(--as-green-bg); transition: background-color .6s ease; }
+/* --as-muted is 4.47:1 on the green highlight; --as-grey keeps 4.5:1+ (light 6.9:1, dark 9:1). */
+.as-row[data-new="true"] p:not(.as-row-title) { color: var(--as-grey); }
 .as-backup { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 8px 0 0 -12px; color: var(--as-muted); font-size: 14px; }
 /* While the Undo toast shows, leave room under the last row and footer, and keep focused controls above it. */
 .as[data-toast="true"] .as-body { padding-bottom: 120px; }
