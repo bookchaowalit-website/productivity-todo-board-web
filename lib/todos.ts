@@ -112,8 +112,9 @@ export function exportTodos(todos: Todo[]): string {
 
 /**
  * Validate a backup file before touching the board. Returns null when it is not a Todo Board backup: not JSON,
- * not an array, or a non-empty array without a single valid task (e.g. another app's export). Text is cleaned
- * the same way as typed tasks; tasks whose text is empty after cleaning are dropped.
+ * not an array, or a non-empty array without a single valid task (e.g. another app's export). Each task keeps its
+ * text exactly as saved (the board may hold text from older versions that typing rules would now trim or cut, and a
+ * restore must give it back unchanged); only tasks with nothing visible to show are dropped.
  */
 export function readBackup(raw: string): Todo[] | null {
   const parsed = parseTodos(raw);
@@ -121,7 +122,7 @@ export function readBackup(raw: string): Todo[] | null {
   let data: unknown[] = [];
   try { data = JSON.parse(raw) as unknown[]; } catch { return null; }
   if (data.length > 0 && parsed.length === 0) return null;
-  return parsed.map((todo) => ({ ...todo, text: cleanText(todo.text) })).filter((todo) => todo.text);
+  return parsed.filter((todo) => cleanText(todo.text) !== "");
 }
 
 const sameTodo = (a: Todo, b: Todo) => a.text === b.text && a.completed === b.completed && a.priority === b.priority && a.category === b.category;

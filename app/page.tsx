@@ -27,7 +27,7 @@ function importMessage({ added, replaced, droppedSamples, skipped }: RestoreResu
 }
 
 export default function Home() {
-  const [todos, setTodos, , saveFailed] = useStoredState(STORE_KEY, SAMPLE_TODOS, parseTodos);
+  const [todos, setTodos, loaded, saveFailed] = useStoredState(STORE_KEY, SAMPLE_TODOS, parseTodos);
   const [area, setArea] = useState<AreaFilter>("all");
   const [filter, setFilter] = useState<Filter>("all");
   const [text, setText] = useState("");
@@ -288,7 +288,8 @@ export default function Home() {
 
           <p className="as-note">Saved in this browser only. No account and nothing is uploaded. Export a backup before clearing browser data.</p>
           <div className="as-backup">
-            <button type="button" className="as-plain" onClick={exportBackup}>Export JSON</button>
+            {/* Until the saved board has loaded, the list still shows the samples: exporting then would save the wrong board. */}
+            <button type="button" className="as-plain" onClick={exportBackup} disabled={!loaded}>Export JSON</button>
             <button type="button" className="as-plain" onClick={() => fileRef.current?.click()}>Import JSON</button>
             <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={importBackup} aria-label="Import a Todo Board backup" />
             <span role="status">{backupNote}</span>

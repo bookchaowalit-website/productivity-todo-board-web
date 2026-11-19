@@ -119,8 +119,14 @@ describe("undo (removalOf / restoreTodos)", () => {
 
 describe("backup", () => {
   const mine: Todo = { id: "a", text: "One", completed: false, priority: "low", category: "work" };
-  it("readBackup accepts an export, cleans text, and rejects files that are not a todo list", () => {
-    expect(readBackup(exportTodos([{ ...mine, text: "  One  " }]))).toEqual([mine]);
+  it("readBackup accepts an export, keeps each task's text unchanged, and rejects files that are not a todo list", () => {
+    expect(readBackup(exportTodos([mine]))).toEqual([mine]);
+    // Text from an older version that today's typing rules would trim, cut at MAX_TEXT or strip of a ZWJ.
+    const long = "x".repeat(MAX_TEXT + 20);
+    const kept = [{ ...mine, text: "  One  " }, { ...mine, id: "b", text: long }, { ...mine, id: "c", text: "👩\u200D💻 pair" }];
+    expect(readBackup(exportTodos(kept))).toEqual(kept);
+    // Nothing visible: dropped.
+    expect(readBackup(exportTodos([{ ...mine, text: " \u200B " }]))).toEqual([]);
     expect(readBackup("[]")).toEqual([]);
     expect(readBackup("{}")).toBeNull();
     expect(readBackup("nope")).toBeNull();

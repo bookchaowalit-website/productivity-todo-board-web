@@ -248,6 +248,25 @@ describe("2026-11-19 review fixes", () => {
     expect($(".as-added")!.textContent).toBe("");
   });
 
+  it("enables Export only once the saved board has loaded, then exports the saved tasks, not the samples", () => {
+    // Before hydration (the server render, and the first client paint) the list shows the samples: no Export yet.
+    expect(renderToString(<Home />)).toMatch(/<button[^>]*disabled=""[^>]*>Export JSON<\/button>/);
+    act(() => root.unmount());
+    const saved = [{ id: "mine", text: "My real task", completed: false, priority: "high", category: "work" }];
+    localStorage.setItem("todo-board-v2", JSON.stringify(saved));
+    root = createRoot(host);
+    act(() => root.render(<Home />));
+    expect(button("Export JSON").disabled).toBe(false);
+    let exported = "";
+    const blobs = vi.spyOn(globalThis, "Blob").mockImplementation(function (parts?: BlobPart[]) { exported = String(parts?.[0] ?? ""); return {} as Blob; } as unknown as typeof Blob);
+    Object.assign(URL, { createObjectURL: vi.fn(() => "blob:x"), revokeObjectURL: vi.fn() });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    press(button("Export JSON"));
+    expect(JSON.parse(exported)).toEqual(saved);
+    blobs.mockRestore();
+    click.mockRestore();
+  });
+
   it("exports the board as a JSON download", () => {
     const create = vi.fn(() => "blob:x");
     const revoke = vi.fn();
@@ -281,6 +300,16 @@ describe("final Codex round: import safety", () => {
     await act(async () => { finish(backup); });
     expect(rows()).not.toContain("Buy groceries");
     expect(rows()).toContain("Renew passport");
+  });
+
+  it("restoring an app backup keeps each task's text exactly as saved", async () => {
+    // Text an older version saved: longer than today's typing limit, with a ZWJ emoji and outer spaces.
+    const long = `${"Long task ".repeat(16)}end`;
+    const texts = [long, "👩\u200D💻 pair on the import", "  spaced  "];
+    const saved = texts.map((text, index) => ({ id: `old-${index}`, text, completed: false, priority: "low", category: "work" }));
+    await act(async () => { pick(new File([JSON.stringify(saved)], "backup.json")); });
+    expect(stored().map((todo) => todo.text)).toEqual(expect.arrayContaining(texts));
+    expect(rows()).toEqual(expect.arrayContaining(texts));
   });
 
   it("samples removed by an import come back with Undo", async () => {
