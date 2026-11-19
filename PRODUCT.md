@@ -56,6 +56,13 @@ the card from Live to Prototype:
   the backup file (Codex review 2026-11-19, P3, accepted).
 - **Storage refused:** if the browser will not save (full or blocked), a visible notice says changes are lost on
   reload; the board keeps working in memory for this visit.
+- **Overlapping imports:** picking a second backup file before the first finishes reading is not blocked; a task
+  removed during that time is only kept out of the newer import, so the older one can bring it back (Codex review
+  2026-11-19, accepted).
+- **Import and a pending Undo:** if an import removes samples while the Undo toast still offers a task the person
+  removed, the toast is replaced and only the samples can be brought back (Codex review 2026-11-19, accepted).
+- **Samples changed back during an import:** a sample edited back to its original state while a file is being read
+  counts as unchanged, so the import may replace or remove it (Codex review 2026-11-19, accepted).
 - **Import Undo:** unchanged samples removed by an import come back with the usual 6-second Undo; after that they
   are gone (there is no trash).
 

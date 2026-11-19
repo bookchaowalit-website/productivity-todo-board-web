@@ -204,3 +204,5 @@ html:has(.as-toast) { scroll-padding-bottom: 96px; }
 /* Final Codex round: a refused save is visible; a ticked new row keeps 4.5:1 on the green highlight. */
 .as-save-error { margin: 12px 0 0; padding: 8px 12px; border: 1px solid var(--as-danger); border-radius: 12px; color: var(--as-fg); font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
 .as-row[data-new="true"][data-done="true"] .as-row-title { color: var(--as-grey); }
+/* On the green highlight the hover tint drops Remove to ~4.4:1; keep the plain background and underline instead. */
+.as-row[data-new="true"] .as-plain:hover { background: transparent; text-decoration: underline; text-underline-offset: 3px; }

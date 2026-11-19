@@ -282,3 +282,11 @@ describe("final Codex round: import safety", () => {
     expect(css).toMatch(/\.as-row\[data-new="true"\]\[data-done="true"\] \.as-row-title \{ color: var\(--as-grey\); \}/);
   });
 });
+
+describe("new-row Remove hover", () => {
+  it("keeps the plain background on hover so Remove stays 4.5:1 on the highlight", async () => {
+    const { readFileSync } = await import("node:fs");
+    const css = readFileSync(`${process.cwd()}/app/app-shell.css`, "utf8");
+    expect(css).toMatch(/\.as-row\[data-new="true"\] \.as-plain:hover \{ background: transparent;/);
+  });
+});
