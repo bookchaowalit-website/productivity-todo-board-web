@@ -229,3 +229,56 @@ describe("2026-11-19 review fixes", () => {
     click.mockRestore();
   });
 });
+
+describe("final Codex round: import safety", () => {
+  const pick = (file: File) => {
+    const input = $<HTMLInputElement>('input[type="file"]')!;
+    Object.defineProperty(input, "files", { value: [file], configurable: true });
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  };
+  const backup = JSON.stringify([
+    { id: "2", text: "Buy groceries", completed: false, priority: "medium", category: "shopping" },
+    { id: "z", text: "Renew passport", completed: false, priority: "high", category: "personal" },
+  ]);
+
+  it("a task removed while the file is being read stays removed", async () => {
+    let finish!: (text: string) => void;
+    const file = new File([""], "backup.json");
+    Object.defineProperty(file, "text", { value: () => new Promise<string>((resolve) => { finish = resolve; }) });
+    await act(async () => { pick(file); });
+    press($('[aria-label="Remove Buy groceries"]')!, 1);
+    await act(async () => { finish(backup); });
+    expect(rows()).not.toContain("Buy groceries");
+    expect(rows()).toContain("Renew passport");
+  });
+
+  it("samples removed by an import come back with Undo", async () => {
+    const file = new File([backup], "backup.json");
+    await act(async () => { pick(file); });
+    expect(rows()).toEqual(["Renew passport", "Buy groceries"]);
+    expect($(".as-toast")!.textContent).toContain("Import removed 2 sample tasks");
+    press(button("Undo"));
+    expect(rows()).toEqual(expect.arrayContaining(["Complete project proposal", "Buy groceries", "Morning workout", "Renew passport"]));
+    expect(rows()).toHaveLength(4);
+  });
+
+  it("an import the browser refuses to save shows a visible error", async () => {
+    const real = window.localStorage;
+    const spy = vi.spyOn(window, "localStorage", "get").mockReturnValue(new Proxy(real, {
+      get(target, prop) {
+        if (prop === "setItem") return () => { throw new DOMException("full", "QuotaExceededError"); };
+        const v = Reflect.get(target, prop, target);
+        return typeof v === "function" ? v.bind(target) : v;
+      },
+    }));
+    await act(async () => { pick(new File([backup], "backup.json")); });
+    spy.mockRestore();
+    expect($('[role="alert"]')!.textContent).toContain("Could not save to this browser’s storage");
+  });
+
+  it("a ticked new row keeps 4.5:1 for its title on the highlight", async () => {
+    const { readFileSync } = await import("node:fs");
+    const css = readFileSync(`${process.cwd()}/app/app-shell.css`, "utf8");
+    expect(css).toMatch(/\.as-row\[data-new="true"\]\[data-done="true"\] \.as-row-title \{ color: var\(--as-grey\); \}/);
+  });
+});

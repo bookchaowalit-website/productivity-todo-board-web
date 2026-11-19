@@ -49,6 +49,16 @@ the card from Live to Prototype:
 - No export/import, no sync, no account; clearing site data deletes the tasks.
 - No product analytics are live.
 
+## Known limits
+
+- **Backup restore order on a fresh board:** a backup task that replaces an unchanged sample keeps the sample's place,
+  and new tasks come after it, so tasks of the same status and priority can come back in a different order than in
+  the backup file (Codex review 2026-11-19, P3, accepted).
+- **Storage refused:** if the browser will not save (full or blocked), a visible notice says changes are lost on
+  reload; the board keeps working in memory for this visit.
+- **Import Undo:** unchanged samples removed by an import come back with the usual 6-second Undo; after that they
+  are gone (there is no trash).
+
 ## Live URL and Deploy State
 
 - Live: https://todo-board.bookchaowalit.com (HTTP 200 on 2026-10-22).

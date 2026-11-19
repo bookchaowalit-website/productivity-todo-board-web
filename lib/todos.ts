@@ -131,7 +131,8 @@ export function isUntouchedSample(todo: Todo, samples: Todo[] = SAMPLE_TODOS): b
   return Boolean(sample && sameTodo(sample, todo));
 }
 
-export type RestoreResult = { todos: Todo[]; added: number; replaced: number; droppedSamples: number; skipped: number };
+/** droppedIds: the unchanged samples the restore removed, so the page can offer Undo for them. */
+export type RestoreResult = { todos: Todo[]; added: number; replaced: number; droppedSamples: number; droppedIds: Set<string>; skipped: number };
 
 /**
  * Apply a validated backup to the latest board (call inside a functional state update).
@@ -142,10 +143,11 @@ export type RestoreResult = { todos: Todo[]; added: number; replaced: number; dr
  * An empty backup changes nothing (it never wipes the samples on its own).
  */
 export function restoreBackup(todos: Todo[], backup: Todo[], samples: Todo[] = SAMPLE_TODOS): RestoreResult {
-  if (!backup.length) return { todos, added: 0, replaced: 0, droppedSamples: 0, skipped: 0 };
+  if (!backup.length) return { todos, added: 0, replaced: 0, droppedSamples: 0, droppedIds: new Set(), skipped: 0 };
   const incoming = new Map(backup.map((todo) => [todo.id, todo]));
   let replaced = 0;
   let droppedSamples = 0;
+  const droppedIds = new Set<string>();
   let skipped = 0;
   const used = new Set<string>();
   const kept: Todo[] = [];
@@ -156,12 +158,12 @@ export function restoreBackup(todos: Todo[], backup: Todo[], samples: Todo[] = S
         used.add(todo.id);
         if (sameTodo(fromBackup, todo)) kept.push(todo);
         else { kept.push(fromBackup); replaced += 1; }
-      } else droppedSamples += 1;
+      } else { droppedSamples += 1; droppedIds.add(todo.id); }
       continue;
     }
     if (fromBackup) { used.add(todo.id); skipped += 1; }
     kept.push(todo);
   }
   const fresh = backup.filter((todo) => !used.has(todo.id));
-  return { todos: [...kept, ...fresh], added: fresh.length, replaced, droppedSamples, skipped };
+  return { todos: [...kept, ...fresh], added: fresh.length, replaced, droppedSamples, droppedIds, skipped };
 }

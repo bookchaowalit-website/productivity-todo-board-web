@@ -12,6 +12,8 @@ import { readStoredState, writeStoredState } from "./stored-state";
 export function useStoredState<T>(key: string, initial: T, parse: (raw: string | null) => T | null) {
   const [value, setValue] = useState<T>(initial);
   const [ready, setReady] = useState(false);
+  // True while the latest write was refused (storage full or blocked): the page can say changes are not saved.
+  const [saveFailed, setSaveFailed] = useState(false);
 
   useEffect(() => {
     let stored: T | null = null;
@@ -31,10 +33,14 @@ export function useStoredState<T>(key: string, initial: T, parse: (raw: string |
     if (!ready) return;
     try {
       writeStoredState(window.localStorage, key, value);
+      // Reporting the outcome of the browser write is this effect's job.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSaveFailed(false);
     } catch {
-      // Storage can be full or blocked (private mode); the in-memory state still works.
+      // Storage can be full or blocked (private mode); the in-memory state still works, but say it is not saved.
+      setSaveFailed(true);
     }
   }, [key, value, ready]);
 
-  return [value, setValue, ready] as const;
+  return [value, setValue, ready, saveFailed] as const;
 }

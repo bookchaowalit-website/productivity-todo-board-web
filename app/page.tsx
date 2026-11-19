@@ -15,15 +15,14 @@ const FILTERS: Filter[] = ["all", "active", "completed"];
 const plural = (n: number) => `${n} ${n === 1 ? "task" : "tasks"}`;
 function importMessage({ added, replaced, droppedSamples, skipped }: RestoreResult): string {
   const restored = added + replaced;
-  if (!restored) return skipped ? "Every task in that file is already on the board." : "Nothing new in that file.";
-  const parts = [`Imported ${plural(restored)}.`];
+  const parts = [restored ? `Imported ${plural(restored)}.` : skipped ? "Every task in that file is already on the board." : "Nothing new in that file."];
   if (droppedSamples) parts.push(`Removed ${droppedSamples} unchanged sample ${droppedSamples === 1 ? "task" : "tasks"}.`);
   if (skipped) parts.push(`${plural(skipped)} already on the board ${skipped === 1 ? "was" : "were"} kept as ${skipped === 1 ? "it is" : "they are"}.`);
   return parts.join(" ");
 }
 
 export default function Home() {
-  const [todos, setTodos] = useStoredState(STORE_KEY, SAMPLE_TODOS, parseTodos);
+  const [todos, setTodos, , saveFailed] = useStoredState(STORE_KEY, SAMPLE_TODOS, parseTodos);
   const [area, setArea] = useState<AreaFilter>("all");
   const [filter, setFilter] = useState<Filter>("all");
   const [text, setText] = useState("");
@@ -43,6 +42,8 @@ export default function Home() {
   const inputRef = useRef<HTMLInputElement>(null);
   const undoRef = useRef<HTMLButtonElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Ids removed while a backup file is being read: the import must not bring them back.
+  const removedDuringImport = useRef<Set<string> | null>(null);
 
   const visible = boardView(todos, filter, area);
   const counts = countTodos(todos, area);
@@ -92,6 +93,7 @@ export default function Home() {
     inputRef.current?.focus();
   }
   function remove(ids: Set<string>, message: string, viaKeyboard: boolean) {
+    for (const id of ids) removedDuringImport.current?.add(id);
     setUndo({ removal: removalOf(todos, ids), message, viaKeyboard });
     setTodos((current) => current.filter((todo) => !ids.has(todo.id)));
     setAnnouncement(`${message}. Undo is available for a few seconds.`);
@@ -113,13 +115,17 @@ export default function Home() {
     // Read and validate the whole file first; only then merge, onto the latest board (tasks added, ticked or
     // removed while the file was being read are kept).
     let raw: string;
+    const removedNow = new Set<string>();
+    removedDuringImport.current = removedNow;
     try {
       raw = await file.text();
     } catch {
       setBackupNote("Could not read that file. Nothing was changed.");
       return;
+    } finally {
+      removedDuringImport.current = null;
     }
-    const backup = readBackup(raw);
+    const backup = readBackup(raw)?.filter((todo) => !removedNow.has(todo.id)) ?? null;
     if (!backup) {
       setBackupNote("That file is not a Todo Board backup. Nothing was changed.");
       return;
@@ -129,11 +135,15 @@ export default function Home() {
       return;
     }
     let result: RestoreResult | undefined;
+    let removal: Removal = [];
     flushSync(() => setTodos((current) => {
       result = restoreBackup(current, backup);
+      removal = removalOf(current, result.droppedIds);
       return result.todos;
     }));
     setBackupNote(importMessage(result!));
+    // Samples the import removed can be brought back like any other removal.
+    if (removal.length) setUndo({ removal, message: `Import removed ${removal.length} sample ${removal.length === 1 ? "task" : "tasks"}`, viaKeyboard: false });
   }
   function closeToast() {
     setUndo(null);
@@ -266,6 +276,9 @@ export default function Home() {
             <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={importBackup} aria-label="Import a Todo Board backup" />
             <span role="status">{backupNote}</span>
           </div>
+          {saveFailed ? (
+            <p className="as-save-error" role="alert">Could not save to this browser’s storage (it may be full or blocked). Changes show here but are lost on reload; keep your backup file.</p>
+          ) : null}
         </main>
       </div>
 
