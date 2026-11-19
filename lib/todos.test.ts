@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addTodo, deleteTodo, boardView, MAX_TEXT, clearCompleted, countTodos, parseTodos, removalOf, restoreTodos, toggleTodo, type Todo } from "./todos";
+import { addTodo, exportTodos, mergeImported, deleteTodo, boardView, MAX_TEXT, clearCompleted, countTodos, parseTodos, removalOf, restoreTodos, toggleTodo, type Todo } from "./todos";
 
 const todos: Todo[] = [
   { id: "1", text: "low open", completed: false, priority: "low", category: "work" },
@@ -114,5 +114,19 @@ describe("undo (removalOf / restoreTodos)", () => {
 
   it("never duplicates a todo that is already back", () => {
     expect(restoreTodos(list, removalOf(list, new Set(["a"]))).length).toBe(4);
+  });
+});
+
+describe("backup", () => {
+  const base: Todo[] = [{ id: "a", text: "One", completed: false, priority: "low", category: "work" }];
+  it("round-trips through exportTodos and mergeImported without duplicates", () => {
+    const raw = exportTodos([...base, { id: "b", text: "  Two  ", completed: true, priority: "high", category: "shopping" }]);
+    const result = mergeImported(base, raw)!;
+    expect(result.added).toBe(1);
+    expect(result.todos.map((t) => t.text)).toEqual(["One", "Two"]);
+  });
+  it("returns null for a file that is not a todo list", () => {
+    expect(mergeImported(base, "{}")).toBeNull();
+    expect(mergeImported(base, "nope")).toBeNull();
   });
 });

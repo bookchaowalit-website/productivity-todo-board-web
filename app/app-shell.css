@@ -60,7 +60,7 @@
 
 /* Layout: sidebar of lists + main pane */
 .as-body { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 24px; width: min(1120px, 100%); margin: 0 auto; padding: 24px clamp(16px, 4vw, 32px) 64px; }
-.as-side h2 { margin: 0 0 8px 12px; color: var(--as-muted); font-size: 13px; font-weight: 600; }
+.as-side h2, .as-side-title { margin: 0 0 8px 12px; color: var(--as-muted); font-size: 13px; font-weight: 600; }
 .as-lists { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
 .as-lists button { display: flex; width: 100%; min-height: 44px; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px; border: 0; border-radius: 10px; background: transparent; font-size: 15px; text-align: left; cursor: pointer; }
 .as-lists button:hover { background: var(--as-hover); }
@@ -70,8 +70,9 @@
 .as-lists button:hover .as-count, .as-lists button[aria-current="true"] .as-count { color: var(--as-grey); }
 .as-dot { display: inline-block; width: 10px; height: 10px; margin-right: 8px; border-radius: 50%; background: var(--as-muted); vertical-align: 0; }
 .as-dot[data-tone="green"] { background: var(--as-green); }
-.as-dot[data-tone="amber"] { background: #e0a100; }
-.as-dot[data-tone="grey"] { background: #8e8e93; }
+/* Dots are graphics: the pill text tones keep 3:1+ on the page and the selected tint (#e0a100 was 2.1:1). */
+.as-dot[data-tone="amber"] { background: var(--as-amber); }
+.as-dot[data-tone="grey"] { background: var(--as-grey); }
 
 /* Grid items default to min-width:auto; 0 lets the phone list row scroll instead of widening the page. */
 .as-side, .as-main { min-width: 0; }
@@ -111,7 +112,7 @@
 .as-list { margin: 0; padding: 0; list-style: none; border: 1px solid var(--as-line); border-radius: 18px; background: var(--as-surface); box-shadow: var(--as-shadow); overflow: hidden; }
 .as-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 12px 8px 12px 16px; }
 .as-row + .as-row { border-top: 1px solid var(--as-line); }
-.as-row h3 { margin: 0; font-size: 16px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.as-row h3, .as-row .as-row-title { margin: 0; color: var(--as-fg); font-size: 16px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
 .as-row p { margin: 2px 0 0; color: var(--as-muted); font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
 .as-pill { display: inline-flex; align-items: center; min-height: 26px; padding: 0 10px; border-radius: 980px; font-size: 13px; font-weight: 600; white-space: nowrap; }
 .as-pill[data-tone="green"] { color: var(--as-green); background: var(--as-green-bg); }
@@ -135,7 +136,7 @@
 /* Phones: the sidebar becomes a scrollable row of lists above the main pane. */
 @media (max-width: 760px) {
   .as-body { grid-template-columns: 1fr; gap: 12px; padding-top: 16px; }
-  .as-side h2 { display: none; }
+  .as-side h2, .as-side-title { display: none; }
   .as-brand small { display: none; }
   .as-lists { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 6px; margin: -6px; }
   .as-lists button { width: auto; white-space: nowrap; border: 1px solid var(--as-line); border-radius: 980px; background: var(--as-surface); }
@@ -159,7 +160,7 @@
 .as-check span { width: 24px; height: 24px; border: 2px solid var(--as-muted); border-radius: 50%; transition: background-color .15s ease, border-color .15s ease; }
 .as-check input:checked + span { border-color: var(--as-button); background: var(--as-button) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 12.5 4 4 8-9'/%3E%3C/svg%3E") center / 16px no-repeat; }
 .as-check:has(input:focus-visible) span { outline: 3px solid var(--as-focus); outline-offset: 2px; }
-.as-row[data-done="true"] h3 { color: var(--as-muted); text-decoration: line-through; }
+.as-row[data-done="true"] h3, .as-row[data-done="true"] .as-row-title { color: var(--as-muted); text-decoration: line-through; }
 .as-chips { display: flex; flex-wrap: wrap; gap: 12px 24px; }
 @media (max-width: 760px) {
   .as-row-check { grid-template-columns: 44px minmax(0, 1fr) auto; }
@@ -171,3 +172,28 @@
 
 /* The top bar is sticky: keep skip-link targets and keyboard-focused controls clear of it when the page scrolls to them. */
 html { scroll-padding-top: 64px; scroll-padding-bottom: 16px; }
+
+/* 2026-11-19 review: filters vs. form values, hover, counter, add feedback, backup, toast clearance. */
+.as-segmented button:hover:not([aria-pressed="true"]) { background: var(--as-hover); }
+.as-tools-label { color: var(--as-muted); font-size: 14px; font-weight: 600; }
+/* The status filter reads as a filter (outlined, selected filled dark), unlike the grey segmented choices in the composer. */
+.as-filter { border: 1px solid var(--as-field-line); background: var(--as-surface); }
+.as-filter button[aria-pressed="true"] { background: var(--as-fg); color: var(--as-bg); box-shadow: none; }
+.as-counter { margin: -6px 0 0; color: var(--as-muted); font-size: 13px; font-variant-numeric: tabular-nums; text-align: right; }
+.as-counter[data-near="true"] { color: var(--as-fg); font-weight: 600; }
+.as-added { min-height: 0; margin: -8px 0 12px; color: var(--as-green); font-size: 14px; font-weight: 600; }
+.as-added:empty { display: none; }
+.as-row[data-new="true"] { background: var(--as-green-bg); transition: background-color .6s ease; }
+.as-backup { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 8px 0 0 -12px; color: var(--as-muted); font-size: 14px; }
+/* While the Undo toast shows, leave room under the last row and footer, and keep focused controls above it. */
+.as[data-toast="true"] .as-body { padding-bottom: 120px; }
+html:has(.as-toast) { scroll-padding-bottom: 96px; }
+@media (max-width: 760px) {
+  /* Wrap the list chips instead of a hidden-scrollbar row that cut off the last list. */
+  .as-lists { flex-wrap: wrap; overflow-x: visible; }
+  /* Priority and List show once the composer is in use, so the first tasks fit on the first screen. */
+  .as-composer:not([data-open="true"]) .as-chips { display: none; }
+}
+@media (forced-colors: active) {
+  .as-filter button[aria-pressed="true"] { forced-color-adjust: none; background: Highlight; color: HighlightText; }
+}

@@ -97,3 +97,20 @@ export function restoreTodos(todos: Todo[], removal: Removal): Todo[] {
   }
   return result;
 }
+
+/** Backup file: the board as pretty JSON, read back by mergeImported. */
+export function exportTodos(todos: Todo[]): string {
+  return JSON.stringify(todos, null, 2);
+}
+
+/**
+ * Import a backup: valid todos whose id is not on the board yet are added after the current tasks.
+ * Returns null when the file is not a todo list (not JSON or not an array), so nothing changes.
+ */
+export function mergeImported(todos: Todo[], raw: string): { todos: Todo[]; added: number } | null {
+  const incoming = parseTodos(raw);
+  if (!incoming) return null;
+  const ids = new Set(todos.map((todo) => todo.id));
+  const fresh = incoming.filter((todo) => !ids.has(todo.id)).map((todo) => ({ ...todo, text: cleanText(todo.text) })).filter((todo) => todo.text);
+  return { todos: [...todos, ...fresh], added: fresh.length };
+}

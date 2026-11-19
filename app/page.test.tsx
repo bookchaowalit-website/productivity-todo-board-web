@@ -12,7 +12,7 @@ let root: Root;
 let host: HTMLDivElement;
 const $ = <T extends Element = HTMLElement>(selector: string) => host.querySelector(selector) as T | null;
 const button = (text: string, scope: ParentNode = host) => [...scope.querySelectorAll("button")].find((b) => b.textContent?.trim().startsWith(text)) as HTMLButtonElement;
-const rows = () => [...host.querySelectorAll(".as-row h3")].map((h) => h.textContent);
+const rows = () => [...host.querySelectorAll(".as-row .as-row-title")].map((h) => h.textContent);
 const press = (el: Element, detail = 0) => act(() => { el.dispatchEvent(new MouseEvent("click", { bubbles: true, detail })); });
 function type(el: HTMLInputElement, value: string) {
   act(() => {
@@ -123,5 +123,72 @@ describe("remove, clear and undo", () => {
     expect(document.activeElement?.textContent).not.toBe("Undo");
     act(() => { vi.advanceTimersByTime(6000); });
     expect($(".as-toast")).toBeNull();
+  });
+});
+
+describe("2026-11-19 review fixes", () => {
+  it("has one h1 as the first heading and no skipped levels in the rows", () => {
+    const headings = [...host.querySelectorAll("h1, h2, h3, h4")].map((h) => h.tagName);
+    expect(headings[0]).toBe("H1");
+    expect(headings).not.toContain("H3");
+  });
+
+  it("shows a character counter tied to the task field", () => {
+    const input = $<HTMLInputElement>(".as-composer input")!;
+    expect(input.getAttribute("aria-describedby")).toBe("task-count");
+    type(input, "x".repeat(125));
+    expect($("#task-count")!.textContent).toBe("125/140 characters");
+    expect($("#task-count")!.dataset.near).toBe("true");
+  });
+
+  it("names a new task in a visible status line and highlights its row, even when it sorts below others", () => {
+    vi.useFakeTimers();
+    type($<HTMLInputElement>(".as-composer input")!, "Water plants");
+    press(button("Low", $(".as-composer")!));
+    press(button("Add", $(".as-composer")!));
+    expect($(".as-added")!.textContent).toBe("Added “Water plants” to Work · Low priority.");
+    const row = $('.as-row[data-new="true"]')!;
+    expect(row.textContent).toContain("Water plants");
+    act(() => { vi.advanceTimersByTime(4000); });
+    expect($('.as-row[data-new="true"]')).toBeNull();
+    expect($(".as-added")!.textContent).toBe("");
+  });
+
+  it("marks the composer open while it has focus so phones can hide Priority and List until then", () => {
+    const form = $<HTMLFormElement>(".as-composer")!;
+    expect(form.dataset.open).toBeUndefined();
+    act(() => { $<HTMLInputElement>(".as-composer input")!.focus(); });
+    expect(form.dataset.open).toBe("true");
+  });
+
+  it("flags the page while the Undo toast shows so the body leaves room under it", () => {
+    press($('[aria-label="Remove Buy groceries"]')!, 1);
+    expect($(".as")!.dataset.toast).toBe("true");
+  });
+
+  it("imports a JSON backup, adding only new tasks, and rejects a file that is not one", async () => {
+    const input = $<HTMLInputElement>('input[type="file"]')!;
+    const choose = async (text: string) => {
+      const file = new File([text], "backup.json", { type: "application/json" });
+      Object.defineProperty(input, "files", { value: [file], configurable: true });
+      await act(async () => { input.dispatchEvent(new Event("change", { bubbles: true })); });
+    };
+    await choose(JSON.stringify([{ id: "1", text: "Complete project proposal", completed: false, priority: "high", category: "work" }, { id: "z", text: "Renew passport", completed: false, priority: "high", category: "personal" }]));
+    expect(host.textContent).toContain("Imported 1 task.");
+    expect(rows()).toContain("Renew passport");
+    await choose("not json");
+    expect(host.textContent).toContain("That file is not a Todo Board backup.");
+  });
+
+  it("exports the board as a JSON download", () => {
+    const create = vi.fn(() => "blob:x");
+    const revoke = vi.fn();
+    Object.assign(URL, { createObjectURL: create, revokeObjectURL: revoke });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    press(button("Export JSON"));
+    expect(create).toHaveBeenCalledOnce();
+    expect(click).toHaveBeenCalledOnce();
+    expect(host.textContent).toContain("Exported 3 tasks.");
+    click.mockRestore();
   });
 });
