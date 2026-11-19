@@ -63,6 +63,11 @@ the card from Live to Prototype:
   removed, the toast is replaced and only the samples can be brought back (Codex review 2026-11-19, accepted).
 - **Samples changed back during an import:** a sample edited back to its original state while a file is being read
   counts as unchanged, so the import may replace or remove it (Codex review 2026-11-19, accepted).
+- **Undo after importing an older copy:** if a task is removed and a backup holding an older version of it (same id)
+  is imported before Undo expires, the import brings the older version back and Undo then skips that id, so the
+  removed version is not restored although the toast says it was (Codex review 2026-11-19, accepted).
+- **Partly invalid backups:** tasks in a backup file that fail validation (e.g. `completed` as a string) are dropped
+  silently; the message counts only the tasks imported or already on the board (Codex review 2026-11-19, accepted).
 - **Import Undo:** unchanged samples removed by an import come back with the usual 6-second Undo; after that they
   are gone (there is no trash).
 
