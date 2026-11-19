@@ -126,6 +126,37 @@ describe("remove, clear and undo", () => {
   });
 });
 
+describe("batch Undo", () => {
+  it("consecutive removes restore together with one Undo, each in its place", () => {
+    vi.useFakeTimers();
+    const before = rows();
+    press($('[aria-label="Remove Buy groceries"]')!, 1);
+    act(() => { vi.advanceTimersByTime(4000); });
+    press(button("Clear 1 done"), 1);
+    expect(rows()).toEqual(["Complete project proposal"]);
+    expect($(".as-toast span")!.textContent).toBe("Removed 2 tasks");
+    // The second removal restarted the 6 s window.
+    act(() => { vi.advanceTimersByTime(4000); });
+    press(button("Undo"), 1);
+    expect(rows()).toEqual(before);
+    expect(stored()).toHaveLength(3);
+    expect($('.as-sr[role="status"]')!.textContent).toBe("Restored 2 tasks.");
+    expect($(".as-toast")).toBeNull();
+  });
+
+  it("keyboard remove focuses Undo, also for the second removal in a batch; Escape goes to the task field", () => {
+    press($('[aria-label="Remove Buy groceries"]')!, 0);
+    expect(document.activeElement).toBe(button("Undo"));
+    press($('[aria-label="Remove Complete project proposal"]')!, 0);
+    expect(document.activeElement).toBe(button("Undo"));
+    expect($(".as-toast span")!.textContent).toBe("Removed 2 tasks");
+    act(() => { $(".as-toast")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+    expect($(".as-toast")).toBeNull();
+    expect(document.activeElement).toBe($(".as-composer input"));
+    expect(rows()).toEqual(["Morning workout"]);
+  });
+});
+
 describe("2026-11-19 review fixes", () => {
   it("has one h1 as the first heading and no skipped levels in the rows", () => {
     const headings = [...host.querySelectorAll("h1, h2, h3, h4")].map((h) => h.tagName);

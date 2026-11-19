@@ -13,6 +13,11 @@ const label = (value: string) => value[0].toUpperCase() + value.slice(1);
 const FILTERS: Filter[] = ["all", "active", "completed"];
 
 const plural = (n: number) => `${n} ${n === 1 ? "task" : "tasks"}`;
+// Every removal still inside the Undo window, oldest first (a Remove, a Clear done, or samples an import dropped).
+// One Undo restores them all. `message` names a lone removal; a batch is summed up as "Removed N tasks".
+type RemovedGroup = { removal: Removal; message: string };
+type UndoBatch = { groups: RemovedGroup[]; viaKeyboard: boolean };
+const batchMessage = (groups: RemovedGroup[]) => (groups.length === 1 ? groups[0].message : `Removed ${plural(groups.reduce((sum, group) => sum + group.removal.length, 0))}`);
 function importMessage({ added, replaced, droppedSamples, skipped }: RestoreResult): string {
   const restored = added + replaced;
   const parts = [restored ? `Imported ${plural(restored)}.` : skipped ? "Every task in that file is already on the board." : "Nothing new in that file."];
@@ -28,7 +33,16 @@ export default function Home() {
   const [text, setText] = useState("");
   const [priority, setPriority] = useState<Priority>("medium");
   const [category, setCategory] = useState<Category>("work");
-  const [undo, setUndo] = useState<{ removal: Removal; message: string; viaKeyboard: boolean } | null>(null);
+  const [undo, setUndoState] = useState<UndoBatch | null>(null);
+  // The latest batch, so two removals before a re-render still both land in it.
+  const undoBatch = useRef<UndoBatch | null>(null);
+  const setUndo = (batch: UndoBatch | null) => { undoBatch.current = batch; setUndoState(batch); };
+  // Join the batch of removals still inside the Undo window.
+  const addToUndo = (group: RemovedGroup, viaKeyboard: boolean) => {
+    const batch = { groups: [...(undoBatch.current?.groups ?? []), group], viaKeyboard };
+    setUndo(batch);
+    return batch;
+  };
   const [toastFocused, setToastFocused] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   // The last added task: highlighted in the list and named in a visible line under the composer.
@@ -54,7 +68,8 @@ export default function Home() {
   useEffect(() => { if (undo?.viaKeyboard) undoRef.current?.focus(); }, [undo]);
   useEffect(() => {
     if (!undo || toastFocused) return;
-    const timer = window.setTimeout(() => setUndo(null), 6000);
+    // Each removal makes a new batch object, so the 6 s restart from the latest one.
+    const timer = window.setTimeout(() => { undoBatch.current = null; setUndoState(null); }, 6000);
     return () => window.clearTimeout(timer);
   }, [undo, toastFocused]);
   useEffect(() => {
@@ -94,9 +109,9 @@ export default function Home() {
   }
   function remove(ids: Set<string>, message: string, viaKeyboard: boolean) {
     for (const id of ids) removedDuringImport.current?.add(id);
-    setUndo({ removal: removalOf(todos, ids), message, viaKeyboard });
+    const batch = addToUndo({ removal: removalOf(todos, ids), message }, viaKeyboard);
     setTodos((current) => current.filter((todo) => !ids.has(todo.id)));
-    setAnnouncement(`${message}. Undo is available for a few seconds.`);
+    setAnnouncement(`${batchMessage(batch.groups)}. Undo is available for a few seconds.`);
   }
   function exportBackup() {
     const blob = new Blob([exportTodos(todos)], { type: "application/json" });
@@ -143,7 +158,7 @@ export default function Home() {
     }));
     setBackupNote(importMessage(result!));
     // Samples the import removed can be brought back like any other removal.
-    if (removal.length) setUndo({ removal, message: `Import removed ${removal.length} sample ${removal.length === 1 ? "task" : "tasks"}`, viaKeyboard: false });
+    if (removal.length) addToUndo({ removal, message: `Import removed ${removal.length} sample ${removal.length === 1 ? "task" : "tasks"}` }, false);
   }
   function closeToast() {
     setUndo(null);
@@ -151,10 +166,12 @@ export default function Home() {
     inputRef.current?.focus();
   }
   function restore() {
-    if (!undo) return;
-    const { removal } = undo;
-    setTodos((current) => restoreTodos(current, removal));
-    setAnnouncement(removal.length === 1 ? `Restored “${removal[0].item.text}”.` : `Restored ${removal.length} tasks.`);
+    const groups = undoBatch.current?.groups;
+    if (!groups?.length) return;
+    // Latest removal first, so each task goes back before the row that followed it at the time.
+    setTodos((current) => groups.reduceRight((list, { removal }) => restoreTodos(list, removal), current));
+    const all = groups.flatMap(({ removal }) => removal);
+    setAnnouncement(all.length === 1 ? `Restored “${all[0].item.text}”.` : `Restored ${all.length} tasks.`);
     closeToast();
   }
 
@@ -292,7 +309,7 @@ export default function Home() {
           onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setToastFocused(false); }}
           onKeyDown={(event) => { if (event.key === "Escape") closeToast(); }}
         >
-          <span>{undo.message}</span>
+          <span>{batchMessage(undo.groups)}</span>
           <button ref={undoRef} type="button" className="as-plain" onClick={restore}>Undo</button>
         </div>
       ) : null}
